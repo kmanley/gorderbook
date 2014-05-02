@@ -1,5 +1,5 @@
 //package orderbook
-package main
+package orderbook
 
 import (
 	"container/list"
