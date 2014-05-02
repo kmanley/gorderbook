@@ -1,7 +1,3 @@
-/* Questions
-- any way to enforce access to struct members to go through accessor function?
-
-*/
 //package orderbook
 package main
 
@@ -21,6 +17,7 @@ type Name string
 type Deque struct {
 	list.List
 }
+
 type ExecuteCallback func(Name, Name, Price, Size)
 
 const (
@@ -50,7 +47,7 @@ func LogExecute(traderBuy Name, traderSell Name, price Price, size Size) {
 	fmt.Println("EXECUTE", traderBuy, "BUY", traderSell, size, "@", price)
 }
 
-func New(name Name, startOrderID OrderID, maxPrice Price, callback ExecuteCallback) *OrderBook {
+func NewOrderBook(name Name, startOrderID OrderID, maxPrice Price, callback ExecuteCallback) *OrderBook {
 	ob := new(OrderBook)
 	ob.name = name
 	ob.orderID = startOrderID
@@ -63,11 +60,11 @@ func New(name Name, startOrderID OrderID, maxPrice Price, callback ExecuteCallba
 }
 
 /*
-Inserts a new limit order into the order book. If the order 
+Inserts a new limit order into the order book. If the order
 can be matched, one or more calls to the execution callback will
 be made synchronously (one for each fill). If the order can't
 be completely filled, it will be queued in the order book. In either
-case this function returns an order ID that can be used to cancel 
+case this function returns an order ID that can be used to cancel
 the order.*/
 func (ob *OrderBook) LimitOrder(side Side, size Size, price Price, trader Name) OrderID {
 	ob.orderID += 1
@@ -78,7 +75,7 @@ func (ob *OrderBook) LimitOrder(side Side, size Size, price Price, trader Name) 
 			for entries.Len() > 0 {
 				entry := (entries.Front().Value).(Order)
 				if entry.size < size {
-					// the waiting entry's size is less than this buyer's size, 
+					// the waiting entry's size is less than this buyer's size,
 					// so the waiting entry is completely filled
 					ob.callback(trader, entry.trader, price, entry.size)
 					size -= entry.size
@@ -146,7 +143,7 @@ func (ob *OrderBook) LimitOrder(side Side, size Size, price Price, trader Name) 
 }
 
 func main() {
-	ob := New("GBPUSD", 0, 10000, LogExecute)
+	ob := NewOrderBook("GBPUSD", 0, 10000, LogExecute)
 	start := time.Now()
 	//fmt.Println(
 	(&ob).LimitOrder(Buy, 100, 593, "Kevin") //)
