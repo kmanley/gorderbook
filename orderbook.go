@@ -1,10 +1,9 @@
 //package orderbook
-package orderbook
+package gorderbook
 
 import (
-	"container/list"
+	_ "bytes"
 	"fmt"
-	"time"
 )
 
 type Side int8
@@ -12,11 +11,6 @@ type Size int32
 type Price int32
 type OrderID int32
 type Name string
-
-//type Deque list.List
-type Deque struct {
-	list.List
-}
 
 type ExecuteCallback func(Name, Name, Price, Size)
 
@@ -33,12 +27,14 @@ type Order struct {
 	orderID OrderID
 }
 
+type Orders []Order
+
 type OrderBook struct {
 	name        Name
 	orderID     OrderID
 	maxPrice    Price
 	callback    ExecuteCallback
-	pricePoints []Deque
+	pricePoints []Orders
 	bidMax      Price
 	askMin      Price
 }
@@ -53,10 +49,19 @@ func NewOrderBook(name Name, startOrderID OrderID, maxPrice Price, callback Exec
 	ob.orderID = startOrderID
 	ob.maxPrice = maxPrice
 	ob.callback = callback
-	ob.pricePoints = make([]Deque, maxPrice)
+	ob.pricePoints = make([]Orders, maxPrice)
 	ob.bidMax = 0
 	ob.askMin = maxPrice + 1
 	return ob
+}
+
+func (ob *OrderBook) Dump() {
+	for i := ob.maxPrice - 1; i >= 0; i-- {
+		entries := ob.pricePoints[i]
+		if len(entries) > 0 {
+			fmt.Printf("%4d: %v\n", i, entries)
+		}
+	}
 }
 
 /*
@@ -67,19 +72,24 @@ be completely filled, it will be queued in the order book. In either
 case this function returns an order ID that can be used to cancel
 the order.*/
 func (ob *OrderBook) LimitOrder(side Side, size Size, price Price, trader Name) OrderID {
+	fmt.Printf("%+v %+v %+v %+v\n", side, size, price, trader)
 	ob.orderID += 1
 	if side == Buy {
 		// look for outstanding sell orders that cross with the incoming order
 		for price >= ob.askMin {
-			entries := ob.pricePoints[ob.askMin]
-			for entries.Len() > 0 {
-				entry := (entries.Front().Value).(Order)
+			for len(ob.pricePoints[ob.askMin]) > 0 {
+				//fmt.Printf("entries at %d: %+v\n", ob.askMin, entries)
+				//fmt.Println("----------------------------------------------")
+				entries := ob.pricePoints[ob.askMin]
+				entry := entries[0]
 				if entry.size < size {
 					// the waiting entry's size is less than this buyer's size,
 					// so the waiting entry is completely filled
 					ob.callback(trader, entry.trader, price, entry.size)
 					size -= entry.size
-					entries.Remove(entries.Front())
+					//fmt.Println("len before: ", len(entries))
+					ob.pricePoints[ob.askMin] = entries[1:]
+					//fmt.Println("len after: ", len(entries))
 				} else {
 					// the waiting entry's size is greater or equal than the buyer's size
 					// so the buyer's order is completely filled
@@ -87,7 +97,9 @@ func (ob *OrderBook) LimitOrder(side Side, size Size, price Price, trader Name) 
 					if entry.size > size {
 						entry.size -= size
 					} else {
-						entries.Remove(entries.Front())
+						//fmt.Println("len before: ", len(entries))
+						ob.pricePoints[ob.askMin] = entries[1:]
+						//fmt.Println("len after: ", len(entries))
 					}
 					ob.orderID += 1
 					return ob.orderID
@@ -99,7 +111,7 @@ func (ob *OrderBook) LimitOrder(side Side, size Size, price Price, trader Name) 
 		}
 		// if we get here then there is some qty we can't fill, so enqueue the remaining size
 		ob.orderID += 1
-		ob.pricePoints[price].PushBack(Order{side, size, price, trader, ob.orderID})
+		ob.pricePoints[price] = append(ob.pricePoints[price], Order{side, size, price, trader, ob.orderID})
 		if ob.bidMax < price {
 			ob.bidMax = price
 		}
@@ -108,20 +120,26 @@ func (ob *OrderBook) LimitOrder(side Side, size Size, price Price, trader Name) 
 		// new order is a Sell
 		// look for outstanding buy orders that cross with the incoming order
 		for price <= ob.bidMax {
-			entries := ob.pricePoints[ob.bidMax]
-			for entries.Len() > 0 {
-				entry := (entries.Front().Value).(Order)
+			for len(ob.pricePoints[ob.bidMax]) > 0 {
+				//fmt.Printf("entries at %d: %+v\n", ob.bidMax, entries)
+				//fmt.Println("----------------------------------------------")
+				entries := ob.pricePoints[ob.bidMax]
+				entry := entries[0]
 				if entry.size < size {
 					ob.callback(entry.trader, trader, price, entry.size)
 					size -= entry.size
-					entries.Remove(entries.Front())
+					//fmt.Println("len before: ", len(entries))
+					ob.pricePoints[ob.bidMax] = entries[1:]
+					//fmt.Println("len after: ", len(entries))
 				} else {
 					ob.callback(entry.trader, trader, price, size)
 					if entry.size > size {
 						entry.size -= size
 					} else {
 						// entry.size == size
-						entries.Remove(entries.Front())
+						//fmt.Println("len before: ", len(entries))
+						ob.pricePoints[ob.bidMax] = entries[1:]
+						//fmt.Println("len after: ", len(entries))
 					}
 					ob.orderID += 1
 					return ob.orderID
@@ -133,7 +151,7 @@ func (ob *OrderBook) LimitOrder(side Side, size Size, price Price, trader Name) 
 		}
 		// if we get here then there is some qty we can't fill, so enqueue the order
 		ob.orderID += 1
-		ob.pricePoints[price].PushBack(Order{side, size, price, trader, ob.orderID})
+		ob.pricePoints[price] = append(ob.pricePoints[price], Order{side, size, price, trader, ob.orderID})
 		if ob.askMin > price {
 			ob.askMin = price
 		}
@@ -142,24 +160,17 @@ func (ob *OrderBook) LimitOrder(side Side, size Size, price Price, trader Name) 
 	return -1
 }
 
-func main() {
-	ob := NewOrderBook("GBPUSD", 0, 10000, LogExecute)
-	start := time.Now()
-	//fmt.Println(
-	(&ob).LimitOrder(Buy, 100, 593, "Kevin") //)
-	fmt.Println("got here")
-	//fmt.Println(
-	(&ob).LimitOrder(Sell, 100, 200, "Tom") //)
-	elapsed := time.Since(start)
-	fmt.Println("elapsed time:", elapsed)
-	/*
-		fmt.Println(ob.name)
-		ob.pricePoints[0].PushBack(10)
-		ob.pricePoints[1].PushBack(100)
-		fmt.Println(ob.pricePoints[0])
-		l := ob.pricePoints[1]
-		for e := l.Front(); e != nil; e = e.Next() {
-			fmt.Println(e.Value)
+/*
+func (ob *OrderBook) renderLevel(level Level) {
+	var buffer bytes.Buffer
+	for
+
+        ret = ",".join(("%s:%s(%s)" % (order.size, order.trader, order.order_id) for order in level))
+        if len(ret) > maxlen:
+            ret = ",".join((str(order.size) for order in level))
+        if len(ret) > maxlen:
+            ret = "%d orders (total size %d)" % (len(level), sum((order.size for order in level)))
+            assert len(ret) <= maxlen
+        return ret
 		}
-	*/
-}
+*/
