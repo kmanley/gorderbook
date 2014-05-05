@@ -27,7 +27,6 @@ func TestOrderBook(t *testing.T) {
 
 func TestOrderBook2(t *testing.T) {
 	// See "Trading and Exchanges" by Harris, p126 (Continuous Trading Example)
-	//func
 	book := NewOrderBook("BTCUSD", 0, 10000, LogExecute)
 	(&book).LimitOrderEx(Buy, 3, 200, "Bea", func(_ string, _ string, _ Price, _ Size) {
 		t.Error("shouldn't have been called")
@@ -93,8 +92,14 @@ func TestOrderBook2(t *testing.T) {
 }
 
 // go test -bench=BenchmarkOrderBook
-// BenchmarkOrderBook	 5000000	       635 ns/op
-// ok  	github.com/kmanley/gorderbook	3.835s
+// PASS
+// BenchmarkOrderBook	0 trade executions
+// 63 trade executions
+// 7426 trade executions
+// 741709 trade executions
+// 3704291 trade executions
+//  5000000	       639 ns/op
+// ok  	github.com/kmanley/gorderbook	3.854s
 func BenchmarkOrderBook(b *testing.B) {
 	minSize := 1
 	maxSize := 20

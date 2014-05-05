@@ -1,5 +1,6 @@
-// a fast limit order book implementation based on the
+// a fast limit order book implementation inspired by the
 // 2011 quantcup winner "voyager". See http://www.quantcup.org/
+
 package gorderbook
 
 import (
@@ -158,3 +159,9 @@ func (ob *OrderBook) LimitOrderEx(side Side, size Size, price Price,
 	}
 	return -1
 }
+
+/*
+TODO:
+ - implement market order type
+ - implement order cancellation
+*/
